@@ -1,32 +1,35 @@
 #!/bin/sh
 set -e
 
-echo "[startup] Clasificados Plus — checking database..."
+echo "[startup] v5 — Clasificados Plus"
 
-# Support both DATABASE_URI and DATABASE_URL (Coolify may inject either name)
+# Dump all DB-related env vars (mask passwords) so we can see exactly what Coolify injected
+echo "[startup] ENV SNAPSHOT:"
+env | grep -iE 'database|postgres|payload|next_public' \
+  | sed 's|\(://[^:]*:\)[^@]*@|\1***@|g' \
+  | sort \
+  || echo "[startup] (no matching env vars found)"
+
+# Accept either DATABASE_URI or DATABASE_URL — Coolify may inject either
 DATABASE_URI="${DATABASE_URI:-$DATABASE_URL}"
-export DATABASE_URI   # must export BEFORE spawning node child processes
+export DATABASE_URI   # export BEFORE spawning any child process
 
 if [ -z "$DATABASE_URI" ]; then
-  echo "[startup] FATAL: no DATABASE_URI or DATABASE_URL env var found in environment."
-  echo "[startup] Set DATABASE_URI in Coolify App B → Environment Variables and redeploy."
+  echo "[startup] FATAL: no DATABASE_URI or DATABASE_URL in environment."
+  echo "[startup] Go to Coolify → App B → Environment Variables → add DATABASE_URI."
   exit 1
 fi
 
-# Print host shell sees (mask password)
 DB_HOST=$(echo "$DATABASE_URI" | sed 's|.*@||' | sed 's|[:/].*||')
-echo "[startup] shell sees host: $DB_HOST"
+echo "[startup] shell host: $DB_HOST"
 
-# Check if payload_migrations table exists — 10 s timeout so we fail fast if unreachable
 node << 'EOF'
 const { Pool } = require('pg')
 const uri = process.env.DATABASE_URI || process.env.DATABASE_URL
-// Log exactly what node sees so we can diff against what the shell printed
 const masked = uri ? uri.replace(/:([^:@/?#]+)@/, ':***@') : '(not set)'
-console.log('[startup] node sees URI:', masked)
+console.log('[startup] node URI:', masked)
 if (!uri) {
-  console.error('[startup] FATAL: DATABASE_URI is not visible to the node process.')
-  console.error('[startup] Check env var is saved in Coolify and redeploy.')
+  console.error('[startup] FATAL: DATABASE_URI not visible to node — export failed.')
   process.exit(1)
 }
 const pool = new Pool({ connectionString: uri, connectionTimeoutMillis: 10000 })
@@ -54,7 +57,7 @@ if [ "$DB_FRESH" -ne 0 ]; then
   node_modules/.bin/payload migrate
   echo "[startup] Schema created."
 else
-  echo "[startup] DB initialized. Running any pending migrations..."
+  echo "[startup] DB initialized. Running pending migrations..."
   node_modules/.bin/payload migrate
 fi
 
