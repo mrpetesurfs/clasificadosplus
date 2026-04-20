@@ -3,50 +3,49 @@ set -e
 
 echo "[startup] Clasificados Plus — checking database..."
 
-# Support both DATABASE_URI and DATABASE_URL (Coolify may inject either)
+# Support both DATABASE_URI and DATABASE_URL (Coolify may inject either name)
 DATABASE_URI="${DATABASE_URI:-$DATABASE_URL}"
+export DATABASE_URI   # must export BEFORE spawning node child processes
 
 if [ -z "$DATABASE_URI" ]; then
-  echo "[startup] FATAL: no DATABASE_URI or DATABASE_URL env var set."
-  echo "[startup] Set DATABASE_URI in Coolify → App → Environment Variables and redeploy."
+  echo "[startup] FATAL: no DATABASE_URI or DATABASE_URL env var found in environment."
+  echo "[startup] Set DATABASE_URI in Coolify App B → Environment Variables and redeploy."
   exit 1
 fi
 
-# Print the host we're connecting to (mask password) to aid debugging
-DB_HOST=$(echo "$DATABASE_URI" | sed 's|.*@||' | sed 's|/.*||')
-echo "[startup] Connecting to: $DB_HOST"
+# Print host shell sees (mask password)
+DB_HOST=$(echo "$DATABASE_URI" | sed 's|.*@||' | sed 's|[:/].*||')
+echo "[startup] shell sees host: $DB_HOST"
 
-# Check if payload_migrations table exists — 10s timeout so we fail fast
+# Check if payload_migrations table exists — 10 s timeout so we fail fast if unreachable
 node << 'EOF'
 const { Pool } = require('pg')
 const uri = process.env.DATABASE_URI || process.env.DATABASE_URL
-const pool = new Pool({
-  connectionString: uri,
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 5000,
-})
+// Log exactly what node sees so we can diff against what the shell printed
+const masked = uri ? uri.replace(/:([^:@/?#]+)@/, ':***@') : '(not set)'
+console.log('[startup] node sees URI:', masked)
+if (!uri) {
+  console.error('[startup] FATAL: DATABASE_URI is not visible to the node process.')
+  console.error('[startup] Check env var is saved in Coolify and redeploy.')
+  process.exit(1)
+}
+const pool = new Pool({ connectionString: uri, connectionTimeoutMillis: 10000 })
 pool.connect()
   .then(client =>
-    client.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_name = 'payload_migrations'
-      )
-    `)
+    client.query(`SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'payload_migrations'
+    )`)
     .then(r => { client.release(); return r })
   )
   .then(r => pool.end().then(() => r))
   .then(r => process.exit(r.rows[0].exists ? 0 : 1))
   .catch(err => {
     console.error('[startup] FATAL: DB connection failed —', err.message)
-    console.error('[startup] Check DATABASE_URI hostname matches the Coolify Postgres internal hostname.')
     process.exit(1)
   })
 EOF
 DB_FRESH=$?
-
-export DATABASE_URI
 
 if [ "$DB_FRESH" -ne 0 ]; then
   echo "[startup] Fresh database. Generating initial migration..."
