@@ -20,7 +20,6 @@ ARG DATABASE_URL
 ARG PAYLOAD_SECRET
 ENV DATABASE_URL=$DATABASE_URL
 ENV PAYLOAD_SECRET=$PAYLOAD_SECRET
-RUN pnpm run generate:importmap
 RUN pnpm run build
 
 # Production runner
