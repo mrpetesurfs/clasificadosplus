@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+
+# Payload (auto-generated)
+src/payload-types.ts
+next-env.d.ts
+
+# Environment
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Local uploads (use R2 in production)
+public/media/
+
+# Misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
