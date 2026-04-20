@@ -15,6 +15,10 @@ import { EventSaves } from './collections/EventSaves'
 import { TicketAffiliateClicks } from './collections/TicketAffiliateClicks'
 import { Deals } from './collections/Deals'
 import { Markets } from './collections/Markets'
+import { Media } from './collections/Media'
+import { Pueblos } from './collections/Pueblos'
+import { Pages } from './collections/Pages'
+import { Guides } from './collections/Guides'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -35,12 +39,22 @@ export default buildConfig({
     TicketAffiliateClicks,
     Deals,
     Markets,
+    Media,
+    Pueblos,
+    Pages,
+    Guides,
   ],
+  localization: {
+    locales: ['es', 'en'],
+    defaultLocale: 'es',
+    fallback: true,
+  },
   editor: lexicalEditor(),
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
     },
+      push: true,
   }),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
