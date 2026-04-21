@@ -102,6 +102,12 @@ delete the existing deployment — Coolify replaces it in-place on successful bu
 
 ---
 
+## Schema management
+
+`payload.config.ts` currently uses `push: true` on the Postgres adapter. This auto-syncs the DB schema on every boot — safe for first deploy, dangerous in production once real data exists.
+
+**When the schema is stable:** set `push: false`, run `pnpm payload migrate:create` locally to generate migration files, commit them, and let Payload apply them on deploy instead.
+
 ## Post-deploy verification
 
 1. Open `https://clasificadosplus.com/admin`
